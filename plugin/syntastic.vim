@@ -546,6 +546,16 @@ function s:FindCheckersForFt(ft)
     return checkers
 endfunction
 
+function! s:SelectedCheckerName(ft)
+    if exists("b:syntastic_checker")
+        return b:syntastic_checker
+    elseif exists("g:syntastic_" . a:ft . "_checker")
+        return {"g:syntastic_" . a:ft . "_checker"}
+    elseif exists("s:default_" . a:ft . "_checker")
+        return {"s:default_" . a:ft . "_checker"}
+    endif
+endfunction
+
 "check if a syntax checker exists for the given filetype - and attempt to
 "load one
 function! SyntasticCheckable(ft, ...)
@@ -553,14 +563,12 @@ function! SyntasticCheckable(ft, ...)
     "syntastic default
     if a:0 >= 1
         let checker = a:1
-    elseif exists("g:syntastic_" . a:ft . "_checker")
-        let checker = {"g:syntastic_" . a:ft . "_checker"}
-    elseif exists("s:default_" . a:ft . "_checker")
-        let checker = {"s:default_" . a:ft . "_checker"}
+    else
+        let checker = s:SelectedCheckerName(a:ft)
     endif
 
     if exists("*SyntaxCheckers_". a:ft ."_GetLocList")
-        if !exists("checker")
+        if empty(checker)
             return 1
         elseif exists("s:last_" . a:ft . "_checker") && checker == {"s:last_" . a:ft . "_checker"}
             return 1
@@ -576,7 +584,7 @@ function! SyntasticCheckable(ft, ...)
         endif
     endif
 
-    if exists("checker") && exists("s:last_" . a:ft . "_checker")
+    if !empty(checker) && exists("s:last_" . a:ft . "_checker")
         if checker != {"s:last_" . a:ft . "_checker"}
             " Wrong checker loaded. Attempt to load the given one instead.
             if !s:LoadChecker(checker, a:ft)
@@ -743,11 +751,11 @@ endfunction
 "e.g. let g:syntastic_python_checker="flake8" will tell syntastic to use
 "flake8 for python.
 function! SyntasticLoadChecker(ft)
-    let opt_name = "g:syntastic_" . a:ft . "_checker"
+    let checker = s:SelectedCheckerName(a:ft)
 
-    if exists(opt_name)
-        let opt_val = {opt_name}
-        if !s:LoadChecker(opt_val, a:ft)
+    if !empty(checker)
+        if !s:LoadChecker(checker, a:ft)
+            throw checker
             echoerr &ft . " syntax not supported or not installed."
         endif
     else
